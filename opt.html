@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>New York Time OTP Generator</title>
+  <style>
+    body {
+      background: #0a0c10;
+      color: #06b6d4;
+      font-family: monospace;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+    .card {
+      background: #141721;
+      border: 1px solid #242938;
+      padding: 24px 40px;
+      border-radius: 12px;
+      text-align: center;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    }
+    #auth-code {
+      font-size: 48px;
+      font-weight: bold;
+      letter-spacing: 6px;
+      color: #10b981;
+      margin: 16px 0;
+    }
+    .meta { font-size: 12px; color: #6b7280; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="meta">NEW YORK TIME-SYNCED OTP</div>
+    <div id="auth-code">------</div>
+    <div class="meta" id="time-display">--:--:-- EST/EDT</div>
+  </div>
+
+  <script>
+    function getNyTimeSeed() {
+      const now = new Date();
+      const options = { timeZone: "America/New_York", year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false };
+      const parts = new Intl.DateTimeFormat('en-US', options).formatToParts(now);
+      
+      let y, m, d, h, min;
+      parts.forEach(p => {
+        if (p.type === 'year') y = p.value;
+        if (p.type === 'month') m = p.value;
+        if (p.type === 'day') d = p.value;
+        if (p.type === 'hour') h = p.value;
+        if (p.type === 'minute') min = p.value;
+      });
+
+      return `${y}${m}${d}${h}${min}`;
+    }
+
+    function generateNyOtp() {
+      const seedStr = getNyTimeSeed();
+      let num = 0;
+      for (let i = 0; i < seedStr.length; i++) {
+        num = (num << 5) - num + seedStr.charCodeAt(i);
+        num |= 0;
+      }
+      const otp = Math.abs(num % 1000000).toString().padStart(6, '0');
+      document.getElementById("auth-code").innerText = otp;
+
+      const nyTimeStr = new Date().toLocaleString("en-US", { timeZone: "America/New_York", timeStyle: "medium" });
+      document.getElementById("time-display").innerText = `${nyTimeStr} (NY Time)`;
+    }
+
+    generateNyOtp();
+    setInterval(generateNyOtp, 1000);
+  </script>
+</body>
+</html>
