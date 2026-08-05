@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DevStudio Portal with NY Time OTP</title>
+  <style>
+    :root {
+      --bg-dark: #0a0c10;
+      --panel-bg: #141721;
+      --editor-bg: #0d0f17;
+      --accent-blue: #3b82f6;
+      --accent-cyan: #06b6d4;
+      --accent-green: #10b981;
+      --accent-orange: #f59e0b;
+      --text-main: #f3f4f6;
+      --text-muted: #6b7280;
+      --border-color: #242938;
+      --danger-color: #ef4444;
+      --term-green: #4af626;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg-dark);
+      color: var(--text-main);
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .overlay {
+      position: fixed; inset: 0;
+      background: rgba(5, 6, 9, 0.92);
+      backdrop-filter: blur(16px);
+      z-index: 999;
+      display: flex; justify-content: center; align-items: center;
+    }
+
+    .modal-card {
+      background: var(--panel-bg);
+      border: 1px solid var(--border-color);
+      padding: 32px; border-radius: 12px;
+      width: 440px; display: flex; flex-direction: column; gap: 16px;
+      box-shadow: 0 25px 50px -12px rgba(0,0,0,0.8);
+    }
+
+    .modal-card h2 { font-size: 20px; color: #fff; }
+
+    input {
+      padding: 12px; background: var(--editor-bg);
+      border: 1px solid var(--border-color); color: var(--text-main);
+      border-radius: 6px; font-size: 14px; outline: none;
+    }
+    input:focus { border-color: var(--accent-cyan); }
+
+    .btn {
+      padding: 10px 16px; border: none; border-radius: 6px;
+      font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s;
+    }
+    .btn-primary { background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan)); color: #fff; }
+    .btn-green { background: var(--accent-green); color: #000; }
+    .btn-orange { background: var(--accent-orange); color: #000; }
+    
+    .error { color: var(--danger-color); font-size: 12px; min-height: 16px; }
+
+    /* Terminal Loading Modal */
+    .terminal-card {
+      background: #05070a;
+      border: 1px solid #1e293b;
+      padding: 24px; border-radius: 8px;
+      width: 480px; font-family: monospace;
+      box-shadow: 0 0 20px rgba(74, 246, 38, 0.15);
+      color: var(--term-green);
+    }
+    .terminal-header {
+      font-size: 12px; border-bottom: 1px solid #1e293b;
+      padding-bottom: 8px; margin-bottom: 12px; color: var(--text-muted);
+      display: flex; justify-content: space-between;
+    }
+    .terminal-logs { font-size: 12px; min-height: 80px; display: flex; flex-direction: column; gap: 4px; }
+    .terminal-progress { margin-top: 12px; font-size: 13px; font-weight: bold; }
+
+    .table-container {
+      width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 12px;
+    }
+    .table-container th, .table-container td {
+      border: 1px solid var(--border-color); padding: 8px 12px; text-align: left;
+    }
+    .table-container th { background: var(--editor-bg); color: var(--accent-cyan); }
+
+    .project-grid { display: flex; flex-direction: column; gap: 10px; max-height: 200px; overflow-y: auto; }
+    .project-card {
+      background: var(--editor-bg); border: 1px solid var(--border-color);
+      padding: 14px; border-radius: 8px; cursor: pointer;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .project-card:hover { border-color: var(--accent-cyan); }
+
+    #app { display: none; flex-direction: column; height: 100vh; }
+
+    header {
+      background: var(--panel-bg); height: 52px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex; align-items: center; justify-content: space-between; padding: 0 16px;
+    }
+
+    .main-workspace { display: flex; flex: 1; height: calc(100vh - 52px); }
+
+    .editor-section {
+      flex: 1; display: flex; flex-direction: column;
+      background: var(--editor-bg); border-right: 1px solid var(--border-color);
+      position: relative;
+    }
+
+    #editor-lock {
+      position: absolute; inset: 0; background: rgba(13, 15, 23, 0.85);
+      backdrop-filter: blur(4px); z-index: 10; display: flex;
+      flex-direction: column; justify-content: center; align-items: center; gap: 12px;
+    }
+
+    .tabs-bar { background: var(--panel-bg); display: flex; border-bottom: 1px solid var(--border-color); }
+    .tab {
+      padding: 10px 18px; font-size: 13px; background: transparent;
+      color: var(--text-muted); border: none; border-right: 1px solid var(--border-color);
+      cursor: pointer; font-family: monospace;
+    }
+    .tab.active { background: var(--editor-bg); color: var(--accent-cyan); border-top: 2px solid var(--accent-cyan); }
+
+    .code-container { flex: 1; display: flex; }
+    .line-numbers {
+      width: 48px; background: var(--panel-bg); color: var(--text-muted);
+      font-family: monospace; font-size: 13px; padding: 12px 0; text-align: right;
+      user-select: none; border-right: 1px solid var(--border-color); overflow: hidden;
+    }
+    .line-numbers div { padding-right: 10px; height: 20px; }
+
+    textarea {
+      flex: 1; background: transparent; color: var(--text-main); border: none;
+      padding: 12px; resize: none; font-family: monospace; font-size: 13px;
+      line-height: 20px; outline: none; white-space: pre; tab-size: 2;
+    }
+
+    .preview-section { flex: 1; display: flex; flex-direction: column; background: #fff; }
+    .preview-header {
+      background: var(--panel-bg); height: 41px; border-bottom: 1px solid var(--border-color);
+      display: flex; align-items: center; padding: 0 12px; gap: 10px;
+    }
+    .url-bar {
+      flex: 1; background: var(--editor-bg); color: var(--text-muted);
+      border-radius: 4px; padding: 4px 10px; font-size: 11px; font-family: monospace;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border: 1px solid var(--border-color);
+    }
+    iframe { flex: 1; border: none; width: 100%; height: 100%; }
+  </style>
+</head>
+<body>
+
+  <!-- Login Modal -->
+  <div id="login-overlay" class="overlay">
+    <div class="modal-card">
+      <h2>DevStudio Login</h2>
+      <input type="text" id="username" placeholder="Username">
+      <input type="password" id="password" placeholder="Password">
+      <button class="btn btn-primary" onclick="login()">Sign In</button>
+      <div id="login-error" class="error"></div>
+    </div>
+  </div>
+
+  <!-- Terminal Loading Screen -->
+  <div id="terminal-overlay" class="overlay" style="display: none;">
+    <div class="terminal-card">
+      <div class="terminal-header">
+        <span>SYS_INIT // SHEET_CONNECT</span>
+        <span id="term-status">CONNECTING...</span>
+      </div>
+      <div class="terminal-logs" id="terminal-logs">
+        <div>> Initializing handshakes...</div>
+      </div>
+      <div class="terminal-progress" id="terminal-bar">[....................] 0%</div>
+    </div>
+  </div>
+
+  <!-- Dashboard Modal -->
+  <div id="dashboard-overlay" class="overlay" style="display: none;">
+    <div class="modal-card" style="width: 500px;">
+      <h2>Project Dashboard</h2>
+      <p style="font-size: 12px; color: var(--text-muted);">Loaded from Google Sheet database:</p>
+      
+      <div id="project-list" class="project-grid"></div>
+
+      <div style="margin-top: 10px;">
+        <p style="font-size: 11px; color: var(--accent-cyan); font-weight: bold; margin-bottom: 4px;">SYSTEM TIME SYNC STATUS</p>
+        <table class="table-container">
+          <thead>
+            <tr>
+              <th>Target Zone</th>
+              <th>New York Time</th>
+              <th>OTP Sync Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>America/New_York</td>
+              <td id="ny-time-display">--:--:--</td>
+              <td style="color: var(--accent-green);">Active (Every 60s)</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <button class="btn btn-primary" onclick="logout()" style="margin-top: 10px;">Sign Out</button>
+    </div>
+  </div>
+
+  <!-- OTP Unlock Modal -->
+  <div id="otp-overlay" class="overlay" style="display: none;">
+    <div class="modal-card">
+      <h2>Unlock Edit Controls</h2>
+      <p style="font-size: 12px; color: var(--text-muted);">Enter 6-digit passcode generated by otp.html:</p>
+      <input type="text" id="edit-otp" placeholder="6-Digit Auth Code" maxlength="6">
+      <button class="btn btn-green" onclick="verifyEditOtp()">Authorize Editor</button>
+      <button class="btn" onclick="closeOtpModal()" style="background: transparent; color: var(--text-muted);">Cancel</button>
+      <div id="otp-error" class="error"></div>
+    </div>
+  </div>
+
+  <!-- Main Application -->
+  <div id="app">
+    <header>
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-weight: bold; font-size: 14px;" id="current-project-title">Project: ---</span>
+        <span id="user-badge" style="font-size: 11px; color: var(--text-muted);">User: ---</span>
+      </div>
+      <div style="display: flex; gap: 8px;">
+        <button class="btn btn-orange" onclick="openAboutBlank(true)">↗ New Tab (about:blank)</button>
+        <button class="btn btn-orange" onclick="openAboutBlank(false)">🗔 Pop-up (about:blank)</button>
+        <button class="btn btn-primary" onclick="openDashboard()">Dashboard</button>
+        <button class="btn btn-green" onclick="publishToServer()">Save & Run</button>
+      </div>
+    </header>
+
+    <div class="main-workspace">
+      <div class="editor-section">
+        <div id="editor-lock">
+          <p style="font-size: 14px; color: var(--text-muted);">Read-Only Server Preview</p>
+          <button class="btn btn-orange" onclick="promptEditUnlock()">🔒 Enter NY Time OTP to Edit</button>
+        </div>
+
+        <div class="tabs-bar">
+          <button class="tab active" onclick="switchTab('html', event)">index.html</button>
+          <button class="tab" onclick="switchTab('css', event)">styles.css</button>
+          <button class="tab" onclick="switchTab('js', event)">script.js</button>
+        </div>
+        <div class="code-container">
+          <div class="line-numbers" id="line-numbers"><div>1</div></div>
+          <textarea id="code-editor" spellcheck="false" oninput="handleInput()" onscroll="syncScroll()" readonly></textarea>
+        </div>
+      </div>
+
+      <div class="preview-section">
+        <div class="preview-header">
+          <div class="url-bar" id="blob-url-display">blob:http://localhost/instance</div>
+        </div>
+        <iframe id="preview-frame"></iframe>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby0AlL4IjrOkgdQaPIHcpYMW2pvm-5j9JFokuncvOu0kum1AfMQe1XhokTIEpaGMJRL/exec";
+
+    let currentUser = null;
+    let loadedProjects = {};
+    let activeProjectId = null;
+    let currentTab = 'html';
+    let isEditUnlocked = false;
+    let currentBlobUrl = null;
+
+    setInterval(() => {
+      const nyStr = new Date().toLocaleString("en-US", { timeZone: "America/New_York", timeStyle: "medium" });
+      const el = document.getElementById("ny-time-display");
+      if (el) el.innerText = nyStr;
+    }, 1000);
+
+    function computeExpectedNyOtp() {
+      const now = new Date();
+      const options = { timeZone: "America/New_York", year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false };
+      const parts = new Intl.DateTimeFormat('en-US', options).formatToParts(now);
+      
+      let y, m, d, h, min;
+      parts.forEach(p => {
+        if (p.type === 'year') y = p.value;
+        if (p.type === 'month') m = p.value;
+        if (p.type === 'day') d = p.value;
+        if (p.type === 'hour') h = p.value;
+        if (p.type === 'minute') min = p.value;
+      });
+
+      const seedStr = `${y}${m}${d}${h}${min}`;
+      let num = 0;
+      for (let i = 0; i < seedStr.length; i++) {
+        num = (num << 5) - num + seedStr.charCodeAt(i);
+        num |= 0;
+      }
+      return Math.abs(num % 1000000).toString().padStart(6, '0');
+    }
+
+    async function hashPassword(str) {
+      const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
+      return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    function runTerminalLoader(callback) {
+      document.getElementById("terminal-overlay").style.display = "flex";
+      const logs = document.getElementById("terminal-logs");
+      const bar = document.getElementById("terminal-bar");
+      
+      let progress = 0;
+      logs.innerHTML = "<div>> Connecting to Google Apps Script endpoint...</div>";
+
+      const interval = setInterval(() => {
+        progress += 20;
+        const blocks = "█".repeat(progress / 5);
+        const dots = ".".repeat(20 - (progress / 5));
+        bar.innerText = `[${blocks}${dots}] ${progress}%`;
+
+        if (progress === 40) {
+          logs.innerHTML += "<div>> Querying user permissions and sheet rows...</div>";
+        } else if (progress === 80) {
+          logs.innerHTML += "<div>> Parsing raw HTML/CSS/JS payload data...</div>";
+        } else if (progress >= 100) {
+          clearInterval(interval);
+          document.getElementById("terminal-overlay").style.display = "none";
+          callback();
+        }
+      }, 180);
+    }
+
+    async function login() {
+      const user = document.getElementById("username").value.trim();
+      const pass = document.getElementById("password").value;
+      const errorDiv = document.getElementById("login-error");
+
+      if (!user || !pass) {
+        errorDiv.innerText = "Please provide username and password.";
+        return;
+      }
+
+      runTerminalLoader(async () => {
+        try {
+          const hashedPass = await hashPassword(pass);
+          const authUrl = `${APPS_SCRIPT_URL}?username=${encodeURIComponent(user)}&passwordHash=${encodeURIComponent(hashedPass)}&password=${encodeURIComponent(pass)}`;
+          
+          const resp = await fetch(authUrl);
+          const data = await resp.json();
+
+          if (data.success) {
+            currentUser = data.user;
+            loadedProjects = data.projects || {};
+            document.getElementById("login-overlay").style.display = "none";
+            openDashboard();
+          } else {
+            errorDiv.innerText = data.error || "Invalid Credentials.";
+          }
+        } catch (err) {
+          errorDiv.innerText = "Connection error. Check APPS_SCRIPT_URL setting.";
+        }
+      });
+    }
+
+    function openDashboard() {
+      const listContainer = document.getElementById("project-list");
+      listContainer.innerHTML = "";
+
+      const keys = Object.keys(loadedProjects);
+
+      if (keys.length === 0) {
+        listContainer.innerHTML = "<p style='font-size:12px; color:var(--text-muted);'>No projects assigned to this user in Google Sheet.</p>";
+      } else {
+        keys.forEach(key => {
+          const item = document.createElement("div");
+          item.className = "project-card";
+          item.innerHTML = `<span><strong>${loadedProjects[key].title}</strong></span><span>➔</span>`;
+          item.onclick = () => loadProject(key);
+          listContainer.appendChild(item);
+        });
+      }
+
+      document.getElementById("dashboard-overlay").style.display = "flex";
+    }
+
+    function loadProject(projectId) {
+      activeProjectId = projectId;
+      isEditUnlocked = false;
+      
+      document.getElementById("dashboard-overlay").style.display = "none";
+      document.getElementById("app").style.display = "flex";
+      document.getElementById("editor-lock").style.display = "flex";
+      document.getElementById("code-editor").readOnly = true;
+
+      document.getElementById("current-project-title").innerText = `Project: ${loadedProjects[projectId].title}`;
+      document.getElementById("user-badge").innerText = `User: ${currentUser.username}`;
+
+      document.getElementById("code-editor").value = loadedProjects[activeProjectId].files[currentTab];
+      updateLineNumbers();
+      publishToServer();
+    }
+
+    function promptEditUnlock() {
+      document.getElementById("otp-overlay").style.display = "flex";
+    }
+
+    function closeOtpModal() {
+      document.getElementById("otp-overlay").style.display = "none";
+    }
+
+    function verifyEditOtp() {
+      const otpInput = document.getElementById("edit-otp").value.trim();
+      const errorDiv = document.getElementById("otp-error");
+      const validOtp = computeExpectedNyOtp();
+
+      if (otpInput === validOtp) {
+        isEditUnlocked = true;
+        document.getElementById("editor-lock").style.display = "none";
+        document.getElementById("code-editor").readOnly = false;
+        closeOtpModal();
+      } else {
+        errorDiv.innerText = "Invalid OTP code for the current minute.";
+      }
+    }
+
+    function publishToServer() {
+      if (!activeProjectId || !loadedProjects[activeProjectId]) return;
+      
+      const p = loadedProjects[activeProjectId].files;
+      let compiled = p.html || "<h1>Empty Workspace</h1>";
+      
+      if (p.css) compiled += `<style>${p.css}</style>`;
+      if (p.js) compiled += `<script>${p.js}<\/script>`;
+
+      const blob = new Blob([compiled], { type: "text/html" });
+      if (currentBlobUrl) URL.revokeObjectURL(currentBlobUrl);
+
+      currentBlobUrl = URL.createObjectURL(blob);
+      document.getElementById("preview-frame").src = currentBlobUrl;
+      document.getElementById("blob-url-display").innerText = currentBlobUrl;
+    }
+
+    function openAboutBlank(asTab = false) {
+      if (!activeProjectId || !loadedProjects[activeProjectId]) return;
+
+      const p = loadedProjects[activeProjectId].files;
+      let compiled = p.html || "<h1>Empty Workspace</h1>";
+      if (p.css) compiled += `<style>${p.css}</style>`;
+      if (p.js) compiled += `<script>${p.js}<\/script>`;
+
+      const target = asTab ? "_blank" : "";
+      const specs = asTab ? "" : "width=800,height=600";
+
+      const win = window.open("about:blank", target, specs);
+      if (win) {
+        win.document.open();
+        win.document.write(compiled);
+        win.document.close();
+      } else {
+        alert("Pop-up blocked! Allow pop-ups for this site to launch about:blank instances.");
+      }
+    }
+
+    function handleInput() {
+      if (!isEditUnlocked) return;
+      loadedProjects[activeProjectId].files[currentTab] = document.getElementById("code-editor").value;
+      updateLineNumbers();
+    }
+
+    function switchTab(tab, event) {
+      if (activeProjectId && isEditUnlocked) {
+        loadedProjects[activeProjectId].files[currentTab] = document.getElementById("code-editor").value;
+      }
+      currentTab = tab;
+      document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+      event.target.classList.add("active");
+
+      document.getElementById("code-editor").value = loadedProjects[activeProjectId].files[currentTab];
+      updateLineNumbers();
+    }
+
+    function updateLineNumbers() {
+      const lines = document.getElementById("code-editor").value.split("\n").length;
+      document.getElementById("line-numbers").innerHTML = Array.from({ length: lines }, (_, i) => `<div>${i + 1}</div>`).join('');
+    }
+
+    function syncScroll() {
+      document.getElementById("line-numbers").scrollTop = document.getElementById("code-editor").scrollTop;
+    }
+
+    function logout() {
+      location.reload();
+    }
+  </script>
+</body>
+</html>
